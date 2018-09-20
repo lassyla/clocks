@@ -1,0 +1,336 @@
+
+<body>
+    <div id="container"></div>
+    <div id="info">press space to reset camera <br> tide of Virginia Beach</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/95/three.js"></script>
+    <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/controls/OrbitControls.js"></script>
+    <script src="noisejs-master/perlin.js"></script>
+<style>
+    body{
+        margin: 0; 
+    }
+    #info{
+        position: absolute; 
+        color: white; 
+        z-index: 2; 
+        margin: 0; 
+        top: 0; 
+    }
+</style>
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+
+        attribute float displacement; 
+
+        uniform float u_noise[100];
+        uniform float u_time; 
+        uniform vec3 u_center; 
+        uniform float u_radius; 
+        uniform bool u_first; 
+        
+        varying vec3 v_position; 
+        varying vec3 v_normal; 
+        varying float v_random; 
+
+        varying float v_dist; 
+
+        float random(vec2 co){
+            return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+        }
+        
+
+        void main() {
+
+            vec3 newPosition = position;    
+            float cosTheta = normalize(position).x; 
+            float sinTheta = sqrt(1.0 - pow(cosTheta, 2.0)); 
+            int index = int(cosTheta * 25.0) + 25; 
+            //if(position.y < 0.0) index += 50; 
+            if(position.x < 0.0) cosTheta *= -1.0; 
+            //newPosition.z +=   cos(20.0 * distance(position, vec3(0.0, 0.0, 0.0)))  / 10.0;
+            //newPosition.z += sin(sin(u_time) * 20.0 * distance(position, vec3(0.0, 0.0, 0.0))) / 10.0;
+            newPosition.x *= cosTheta; 
+            newPosition.y *= sinTheta; 
+
+            newPosition.yx  *= u_noise[index] ; 
+
+            if(u_first) newPosition.yx *= (cos(u_time / 3.0) / 5.0 + u_radius) ; 
+            else if(!u_first) newPosition.yx *= (cos(u_time / 3.0 + 3.14) / 5.0 + u_radius) ; 
+
+            v_position = newPosition; 
+            v_dist = distance(newPosition, vec3(0.0)) / u_radius / 2.0; 
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+            v_normal = normal; 
+            v_random = random(position.xy);
+        }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        varying vec3 v_position; 
+        varying float v_dist; 
+        varying vec3 v_normal;
+        varying float v_random; 
+
+        uniform float u_radius; 
+        uniform bool u_first;
+
+        void main() {
+            vec3 light = vec3(0.5, 0.2, 1.0); 
+            light = normalize(light); 
+            float dProd = 0.5 +  dot(v_normal, light) * 0.1; 
+
+            float dist = pow(v_dist, 2.0); 
+            if(u_first) gl_FragColor =  vec4(dist, dist, 1.0 , 1.0 - dist); 
+            else gl_FragColor =  vec4(0.0, 1.0 - dist, 1.0 , 0.6); 
+            
+            //gl_FragColor =  vec4(dist, dist, 1.0 , 1.0); 
+
+        }
+    </script>
+
+    <script type="application/x-glsl" id="sky-vertex">  
+        varying vec2 vUV;
+        varying float v_z; 
+        void main() {  
+          vUV = uv;
+          vec4 pos = vec4(position, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * pos;
+          v_z = normalize(position).z; 
+        }
+        </script>
+        
+        <script type="application/x-glsl" id="sky-fragment">  
+        uniform sampler2D texture;  
+        varying float v_z; 
+
+        void main() {  
+          gl_FragColor = vec4(cos(v_z), v_z + 0.5, 0.20, 1.0);
+        }
+        </script>  
+
+        
+    <script>
+        //add sky
+        //add clock 
+        //add sand
+        //needs calibration,,
+        
+
+        //https://thebookofshaders.com/04/
+        var container;
+        var camera, scene, renderer, controls;
+        var uniforms, uniforms2, attributes;
+        var mesh; 
+        var tide; 
+        var angle; 
+        var hand; 
+        var pastHighTide = new Date('September 20, 2018 5:12:00')
+        var day = true; 
+        
+
+        init();
+        animate();
+
+        function init() {
+            var date = new Date('September 20, 2018 11:50:00'); 
+            console.log(date); 
+            var diff = (date - pastHighTide) / 60000; //difference in minutes
+            diff = diff % 745; //the number of minutes in a tidal day
+            angle = -1 * Math.PI * 2 * diff / 745; //calclates angle 
+            console.log(angle); 
+
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+            camera.position.z = 5;
+            controls = new THREE.OrbitControls( camera );
+            controls.maxDistance = 10; 
+            controls.enableDamping = true; 
+            controls.maxAzimuthAngle = Math.PI / 2; 
+            controls.minAzimuthAngle = Math.PI / -2; 
+            // controls.minPolarAngle = Math.PI / 4; 
+            // controls.maxPolarAngle = Math.PI * 3 / 4; 
+
+
+            scene = new THREE.Scene();
+
+            var radius = 2 + Math.cos(-1 * angle) / 2.0; 
+            var center = THREE.Vector3(0, 0, 0); 
+
+            var circleGeometry = new THREE.PlaneGeometry(radius, radius, 100, 100); 
+            var geometry = new THREE.BufferGeometry().fromGeometry(circleGeometry); 
+
+            var displacement = new Float32Array(geometry.attributes.position.count); 
+            var u_noise = new Float32Array(100); 
+            var noise2 = new Float32Array(100); 
+
+            for (var i = 0; i < displacement.length; i++) 
+                displacement[i] = noise.simplex2(3 + Math.cos(i * Math.PI * 6 / displacement.length), 3 + Math.sin(i * Math.PI * 6 / displacement.length)) / 7 + 1; 
+                //displacement[i] = Math.random(); 
+            
+            noise.seed(Math.random()); 
+            for (var i = 0; i < u_noise.length / 2; i++) 
+                for (var j = 0; j < u_noise.length / 2; j++) 
+                {
+                    u_noise[i * 10 + j] = noise.simplex2(i / 3.0, j / 3.0) / 7.0 + 1.0; 
+                    noise2[i * 10 + j] = noise.simplex2(j / 3.0, i / 3.0) / 7.0 + 1.0; 
+                }                
+
+            
+            geometry.addAttribute("displacement", new THREE.BufferAttribute(displacement, 1, false))
+            uniforms = {
+                u_noise: { type: "fv1", value: u_noise}, 
+                u_time: { type: "f", value: 1.0 },
+                u_radius: { type: "f", value: radius},
+                u_center: { type: "v3", value: center},
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() }, 
+                u_first: {type: "b", value: true},
+                amplitude: {type: "f", value: 0}
+            };
+
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent, 
+                transparent: true
+            } );
+            mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            // material = new THREE.MeshBasicMaterial( {color: 0xffff00, wireframe: true} );
+            // sky = new THREE.Sky();
+            // sky.scale.setScalar( 450000 );
+            // scene.add( sky );
+
+
+            uniforms2 = {
+                u_noise: { type: "fv1", value: noise2}, 
+                u_time: { type: "f", value: 1.0 },
+                u_radius: { type: "f", value: radius},
+                u_center: { type: "v3", value: center},
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() }, 
+                u_first: {type: "b", value: false},
+                amplitude: {type: "f", value: 0}
+            };
+            var material2 = new THREE.ShaderMaterial( {
+                uniforms: uniforms2,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent, 
+                transparent: true
+            } );
+
+            mesh2 = new THREE.Mesh( geometry, material2 );
+            mesh2.position.z -= 0.01; 
+            scene.add( mesh2 );
+
+            
+            geometry = new THREE.TorusGeometry( 2.5, .1, 20, 50 );
+            material = new THREE.MeshBasicMaterial( { color: 0xffffff, side: THREE.DoubleSide, transparent:true,  opacity: 0.5} );
+            var ring = new THREE.Mesh( geometry, material );
+            scene.add( ring );
+            geometry = new THREE.BoxGeometry( .1, 2, 0.1 );
+            stick = new THREE.Mesh( geometry, material );
+
+            stick.position.y += 1; 
+            
+            var tidehand = new THREE.Group(); 
+            tidehand.add(stick); 
+            tidehand.rotation.z = angle; 
+            scene.add( tidehand );
+
+
+            // geometry = new THREE.CubeGeometry(1000, 1000, 1000); 
+            // var cubeFaces = [
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("right.jpg"), side: THREE.DoubleSide}),
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("left.jpg"), side: THREE.DoubleSide}),
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("middle.jpg"), side: THREE.DoubleSide}),
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("back.jpg"), side: THREE.DoubleSide}),
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("top.jpg"), side: THREE.DoubleSide}),
+            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("face.jpg"), side: THREE.DoubleSide}),
+            // ];
+            // var skybox = new THREE.Mesh(geometry, cubeFaces); 
+            // scene.add(skybox); 
+
+
+            //skydome code from Ian Webster http://www.ianww.com/blog/2014/02/17/making-a-skydome-in-three-dot-js/
+            geometry = new THREE.SphereGeometry(300, 60, 40);  
+            var uniforms3 = {  
+            texture: { type: 't', value: THREE.ImageUtils.loadTexture('space.jpg') }
+            };
+
+            material = new THREE.ShaderMaterial( {  
+            uniforms:       uniforms3,
+            vertexShader:   document.getElementById('sky-vertex').textContent,
+            fragmentShader: document.getElementById('sky-fragment').textContent,
+            side: THREE.DoubleSide
+            });
+
+            skyBox = new THREE.Mesh(geometry, material);  
+            skyBox.eulerOrder = 'XZY';  
+            skyBox.renderDepth = 1000.0;  
+            scene.add(skyBox);  
+
+            
+            var texture = new THREE.TextureLoader().load("clockface.png"); 
+            geometry = new THREE.PlaneGeometry(7, 7); 
+            material = new THREE.MeshBasicMaterial({map:texture, transparent: true,}); 
+            var clockface = new THREE.Mesh(geometry, material); 
+            clockface.position.z += 0.5
+            scene.add(clockface); 
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            document.onmousemove = function(e){
+              uniforms.u_mouse.value.x = e.pageX
+              uniforms.u_mouse.value.y = e.pageY
+            }
+
+            setInterval(function(){
+                tidehand.rotation.z -= Math.PI * 2 / 745; 
+            }, 60000) //move the clock hand every minute 
+
+        }
+
+        function onWindowResize(event) {
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+        }
+
+        function animate() {
+            // mesh.rotation.y += .01;
+            // mesh.rotation.z += .04;  
+            // hand.rotation.z += 0.01; 
+            controls.update(); 
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            uniforms.u_time.value += 0.05;
+            uniforms2.u_time.value += 0.05;
+            renderer.render( scene, camera );
+        }
+
+        document.addEventListener("keydown", function(e){
+            switch(e.keyCode){
+                case 32: 
+                    controls.reset(); 
+                    break; 
+            } 
+
+
+        });
+
+
+    </script>
+</body>
