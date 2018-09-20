@@ -100,7 +100,6 @@
         </script>
         
         <script type="application/x-glsl" id="sky-fragment">  
-        uniform sampler2D texture;  
         varying float v_z; 
 
         void main() {  
@@ -257,12 +256,8 @@
 
             //skydome code from Ian Webster http://www.ianww.com/blog/2014/02/17/making-a-skydome-in-three-dot-js/
             geometry = new THREE.SphereGeometry(300, 60, 40);  
-            var uniforms3 = {  
-            texture: { type: 't', value: THREE.ImageUtils.loadTexture('space.jpg') }
-            };
 
             material = new THREE.ShaderMaterial( {  
-            uniforms:       uniforms3,
             vertexShader:   document.getElementById('sky-vertex').textContent,
             fragmentShader: document.getElementById('sky-fragment').textContent,
             side: THREE.DoubleSide
