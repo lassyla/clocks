@@ -1,7 +1,7 @@
 
 <body>
     <div id="container"></div>
-    <div id="info">press space to reset camera <br> tide of Virginia Beach</div>
+    <div id="info"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/95/three.js"></script>
     <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/controls/OrbitControls.js"></script>
@@ -15,357 +15,266 @@
         color: white; 
         z-index: 2; 
         margin: 0; 
-        top: 0; 
+        top: 30px; 
         font-size: 30px; 
-        width: 100%; 
-        text-align: right; 
+        right: 30px; 
     }
 </style>
 
-    <script id="vertexShader" type="x-shader/x-vertex">
-
-        attribute float displacement; 
-
+    <script id="waterVertex" type="x-shader/x-vertex">
         uniform float u_noise[100];
         uniform float u_time; 
-        uniform vec3 u_center; 
         uniform float u_height; 
-        uniform bool u_first; 
-        
         varying vec3 v_position; 
         varying vec3 v_normal; 
-        varying float v_random; 
-
-        varying float v_dist; 
 
         float random(vec2 co){
             return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
         }
         
-
         void main() {
-
             vec3 newPosition = position;    
-            float cosTheta = normalize(position).x; 
-            float sinTheta = sqrt(1.0 - pow(cosTheta, 2.0)); 
-            int index = int(cosTheta * 25.0) + int(sinTheta * 25.0); 
-            if(position.y < 0.0) index += 20; 
-            if(position.x < 0.0) cosTheta *= -1.0; 
             newPosition.z = cos(u_time / 3.0) / 10.0; 
-            newPosition.z += u_height; 
+            newPosition.z += u_height + 0.1; 
             newPosition.z += random(position.xy) / 15.0; 
-
             v_position = newPosition; 
-            v_dist = distance(newPosition, vec3(0.0)) / 2.0; 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-            v_normal = normal; 
-            v_random = random(position.xy);
         }
     </script>
-    <script id="fragmentShader" type="x-shader/x-fragment">
+    <script id="waterFragment" type="x-shader/x-fragment">
         varying vec3 v_position; 
-        varying float v_dist; 
-        varying vec3 v_normal;
-        varying float v_random; 
-
         uniform float u_radius; 
         uniform vec3 u_camera; 
+        uniform float u_hour; 
 
         void main() {
-            vec3 light = vec3(0.5, 0.2, 1.0); 
-            light = normalize(light); 
-            float dProd = 0.5 +  dot(v_normal, light) * 0.1; 
-
-            float fog = distance(u_camera, v_position) / 15.0; 
-
-            float dist = pow(v_dist, 2.0); 
-            gl_FragColor =  vec4(dist, 1.0, 1.0 , 1.0 - fog ); 
-            
-            //gl_FragColor =  vec4(dist, dist, 1.0 , 1.0); 
-
+            float fog = distance(u_camera, v_position) / 20.0; 
+            float day = clamp(6.0 - abs(12.0 - u_hour), 0.0, 1.0); 
+            vec3 darkBlue = vec3(fog / 4.0, 0.25, 0.5); 
+            vec3 lightBlue = vec3(fog, 0.85, 0.8); 
+            gl_FragColor =  vec4(day * lightBlue + (1.0 - day) * darkBlue, 0.8 - fog ); 
         }
     </script>
-
-
-    <script id="sandVertexShader" type="x-shader/x-vertex">
+    <script id="sandVertex" type="x-shader/x-vertex">
         varying vec2 vUV;
         varying vec3 v_normal; 
         varying vec3 v_position; 
+
         void main() {  
-          vUV = uv;
-          vec4 pos = vec4(position, 1.0);
-          gl_Position = projectionMatrix * modelViewMatrix * pos;
-          v_normal = normalize(normal);
-          v_position = position; 
+            vUV = uv;
+            vec4 pos = vec4(position, 1.0);
+            gl_Position = projectionMatrix * modelViewMatrix * pos;
+            v_normal = normalize(normal);
+            v_position = position; 
         }
     </script>
     
-    <script id="sandFragmentShader" type="x-shader/x-fragment">
+    <script id="sandFragment" type="x-shader/x-fragment">
         varying vec3 v_normal; 
         varying vec3 v_position; 
-
         uniform vec3 u_camera; 
 
         void main() {
-            vec3 lightSource = vec3(1.0, 1.0, 3.0); 
+            vec3 lightSource = normalize(vec3(0.0, 1.0, 3.0)); 
             float dprod = max(dot(v_normal, lightSource), 0.0); 
-            vec3 color = vec3( 0.9, 0.7, 0.20);
-            float fog = distance(u_camera, v_position) / 10.0; 
-
-            gl_FragColor = vec4( color * 0.5 + color * dprod * 0.5, 1.0 - fog);
+            vec3 highlightColor = vec3( 0.7, 0.7, 0.2);
+            vec3 shadowColor = vec3(0.3, 0.3, 0.6); 
+            float fog = pow(distance(vec3(0.0), v_position) , 2.0) / 30.0; 
+            gl_FragColor = vec4( shadowColor + highlightColor  * dprod * 0.4, 0.9 - fog);
         }
     </script>
 
-    <script type="application/x-glsl" id="sky-vertex">  
+    <script id="skyVertex" type="x-shader/x-fragment">  
         varying vec2 vUV;
         varying float v_z; 
+
         void main() {  
-          vUV = uv;
-          vec4 pos = vec4(position, 1.0);
-          gl_Position = projectionMatrix * modelViewMatrix * pos;
-          v_z = normalize(position).z; 
+            vUV = uv;
+            vec4 pos = vec4(position, 1.0);
+            gl_Position = projectionMatrix * modelViewMatrix * pos;
+            v_z = normalize(position).z; 
         }
-        </script>
+    </script>
         
-        <script type="application/x-glsl" id="sky-fragment">  
+    <script id="skyFragment" type="x-shader/x-fragment">  
         varying float v_z; 
         uniform float u_hour; 
 
         void main() {  
-          vec3 dayColor = vec3(0.4 - v_z, 0.6 - v_z, 0.70);
-          vec3 sunsetColor = vec3(0.5 + v_z , 0.2 + v_z, 0.3);
-          vec3 nightColor = vec3(0.05 - v_z / 10.0, 0.05 - v_z / 5.0, 0.20);
+            vec3 dayColor = vec3(0.4 - v_z, 0.7 - v_z, 0.80);
+            vec3 sunsetColor = vec3(0.5 + v_z , 0.2 + v_z, 0.3);
+            vec3 nightColor = vec3(0.05 - v_z / 10.0, 0.05 - v_z / 5.0, 0.20);
 
-          vec3 dtn = vec3(0.0);
-          dtn.x = clamp(6.0 - abs(12.0 - u_hour), 0.0, 1.0); 
-          dtn.z = 1.0 - dtn.x; 
-          dtn.y = clamp(sin(u_hour * 3.14 / 12.0), 0.5, 1.0); 
-          dtn = normalize(dtn); 
+            vec3 dtn = vec3(0.0);
+            dtn.x = clamp(6.0 - abs(12.0 - u_hour), 0.0, 1.0); 
+            dtn.z = 1.0 - dtn.x; 
+            dtn.y = (clamp(sin(u_hour * 3.14 / 12.0), 0.5, 1.0) - 0.5) * 2.0; 
+            dtn = normalize(dtn); 
 
-          gl_FragColor = vec4(dtn.x * dayColor + dtn.y * sunsetColor + dtn.z * nightColor, 1.0); 
+            gl_FragColor = vec4(dtn.x * dayColor + dtn.y * sunsetColor + dtn.z * nightColor, 1.0); 
         }
-        </script>  
+    </script>  
 
         
     <script>
-        //add lighting
-        //make colors nice 
-        //make hand the lighting?? or a shadow?? 
-        
 
         //https://thebookofshaders.com/04/
         var container;
         var camera, scene, renderer, controls;
-        var uniforms, uniforms2, attributes, skyUniforms; 
-        var mesh, tidehand, sand; 
-        var tide; 
-        var angle; 
-        var hand; 
-        var pastHighTide = new Date('September 20, 2018 5:12:00')
-        var date; 
+        var waterUniforms, skyUniforms; 
+        var water, tidehand, sand, clockface; 
+        var angle, date, height; 
+        var pastHighTide = new Date("September 20, 2018 5:12:00")
 
         init();
         animate();
 
         function init() {
-            date = new Date('September 20, 2018 5:12:00'); 
-            var diff = (date - pastHighTide) / 60000; //difference in minutes
-            diff = diff % 745; //the number of minutes in a tidal day
-            angle = -1 * Math.PI * 2 * diff / 745; //calclates angle 
-
-            container = document.getElementById( 'container' );
+            container = document.getElementById( "container" );
 
             camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
             camera.position.z = 6;
             controls = new THREE.OrbitControls( camera );
             controls.maxDistance = 7; 
             controls.minDistance = 1; 
-
             controls.enableDamping = true; 
+            controls.dampingFactor = 0.2;
             controls.maxAzimuthAngle = Math.PI / 4; 
             controls.minAzimuthAngle = Math.PI / -4; 
             controls.minPolarAngle = Math.PI / 4; 
             controls.maxPolarAngle = Math.PI * 3 / 4; 
 
-
             scene = new THREE.Scene();
 
-            var height = Math.cos(-1 * angle) / 7.0; 
-            var center = THREE.Vector3(0, 0, 0); 
+            date = new Date(); 
+            height = Math.cos(-1 * angle) / 7.0; 
 
-            var circleGeometry = new THREE.PlaneGeometry(50, 50, 100, 100); 
-            var geometry = new THREE.BufferGeometry().fromGeometry(circleGeometry); 
+            var geometry = new THREE.PlaneGeometry(50, 50, 100, 100); 
 
-            var displacement = new Float32Array(geometry.attributes.position.count); 
             var u_noise = new Float32Array(100); 
-            var noise2 = new Float32Array(100); 
-
-            for (var i = 0; i < displacement.length; i++) 
-                displacement[i] = noise.simplex2(3 + Math.cos(i * Math.PI * 6 / displacement.length), 3 + Math.sin(i * Math.PI * 6 / displacement.length)) / 7 + 1; 
-                //displacement[i] = Math.random(); 
             
             noise.seed(Math.random()); 
             for (var i = 0; i < u_noise.length / 2; i++) 
                 for (var j = 0; j < u_noise.length / 2; j++) 
-                {
                     u_noise[i * 10 + j] = noise.simplex2(i / 3.0, j / 3.0) / 7.0 + 1.0; 
-                    noise2[i * 10 + j] = noise.simplex2(j / 3.0, i / 3.0) / 7.0 + 1.0; 
-                }                
-
             
-            geometry.addAttribute("displacement", new THREE.BufferAttribute(displacement, 1, false))
-            uniforms = {
+            waterUniforms = {
                 u_noise: { type: "fv1", value: u_noise}, 
                 u_time: { type: "f", value: 1.0 },
                 u_height: { type: "f", value: height},
-                u_center: { type: "v3", value: center},
-                u_resolution: { type: "v2", value: new THREE.Vector2() },
                 u_camera: {type:"v3", value: camera.position}, 
-                u_mouse: { type: "v2", value: new THREE.Vector2() }, 
-                u_first: {type: "b", value: true},
-                amplitude: {type: "f", value: 0}
+                u_hour: {type: "f", value: date.getHours() + date.getMinutes() / 60}
             };
 
-
             var material = new THREE.ShaderMaterial( {
-                uniforms: uniforms,
-                vertexShader: document.getElementById( 'vertexShader' ).textContent,
-                fragmentShader: document.getElementById( 'fragmentShader' ).textContent, 
+                uniforms: waterUniforms,
+                vertexShader: document.getElementById("waterVertex").textContent,
+                fragmentShader: document.getElementById("waterFragment").textContent, 
                 transparent: true, 
-                depthWrite: false
+                depthWrite: false, 
+                side: THREE.DoubleSide
+                
             } );
-            mesh = new THREE.Mesh( geometry, material );
-            scene.add( mesh );
-            material = new THREE.MeshBasicMaterial( { color: 0xffffff, side: THREE.DoubleSide, transparent:true} );
+            water = new THREE.Mesh( geometry, material );
+            scene.add( water );
 
+            //sand geometry made in blender
             var loader = new THREE.JSONLoader();
-            loader.load("bigsand.json", 
-            function(geometry, materials){
-                var uniforms2 = ({
-                    u_camera: {type:"v3", value: camera.position}
-                }); 
-                material = new THREE.ShaderMaterial( {
-                    uniforms: uniforms2, 
-                    vertexShader: document.getElementById( 'sandVertexShader' ).textContent,
-                    fragmentShader: document.getElementById( 'sandFragmentShader' ).textContent, 
-                    transparent: true, 
-                } );
-                var sandy = new THREE.Mesh(geometry, material); 
-                sandy.rotation.x += Math.PI / 2; 
-                sandy.scale.set(2.5, 2.5, 2.5); 
-                sandy.position.x += 1; 
-                sandy.position.y -= 0.6; 
-                sandy.position.z -= .6; 
-                scene.add(sandy); 
-            }, 
-            function(xhr){console.log("load")},
-            function(err){console.log("error")});
+            loader.load("tallsand.json", 
+                function(geometry, materials){
+                    var sandUniforms = ({
+                        u_camera: {type:"v3", value: camera.position}, 
+                        u_hour: {type: "f", value: date.getHours() + date.getMinutes() / 60}
+                    }); 
+                    material = new THREE.ShaderMaterial( {
+                        uniforms: sandUniforms, 
+                        vertexShader: document.getElementById("sandVertex").textContent,
+                        fragmentShader: document.getElementById("sandFragment").textContent, 
+                        transparent: true, 
+                    } );
+                    var sandy = new THREE.Mesh(geometry, material); 
+                    sandy.rotation.x += Math.PI / 2; 
+                    sandy.scale.set(2, 2, 2); 
+                    sandy.position.z = -0.001; 
+                    scene.add(sandy); 
+                }, 
+                function(xhr){console.log("loaded json")},
+                function(err){console.log("error loading json")}
+            );
+                        
             
-            geometry = new THREE.CylinderGeometry(2.5,0, 4, 32); 
-            sand = new THREE.Mesh(geometry, material); 
-            sand.scale.set(1.5, 1.5, 1.5); 
-            sand.rotation.x += Math.PI / 2;
-            sand.position.x += 3; 
-            sand.position.y -= 3;  
-            sand.position.z -= 10.1; 
-            //scene.add(sand); 
-            
-            
-
             geometry = new THREE.PlaneGeometry( .1, 2);
+            material = new THREE.MeshBasicMaterial( { color: 0xffffff, side: THREE.DoubleSide, transparent:true} );
             stick = new THREE.Mesh( geometry, material );
             stick.position.y += .9; 
-            
             tidehand = new THREE.Group(); 
             tidehand.add(stick); 
             tidehand.rotation.z = angle; 
             tidehand.position.z += 1.01; 
             scene.add( tidehand );
 
-
-            // geometry = new THREE.CubeGeometry(1000, 1000, 1000); 
-            // var cubeFaces = [
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("right.jpg"), side: THREE.DoubleSide}),
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("left.jpg"), side: THREE.DoubleSide}),
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("middle.jpg"), side: THREE.DoubleSide}),
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("back.jpg"), side: THREE.DoubleSide}),
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("top.jpg"), side: THREE.DoubleSide}),
-            //     new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("face.jpg"), side: THREE.DoubleSide}),
-            // ];
-            // var skybox = new THREE.Mesh(geometry, cubeFaces); 
-            // scene.add(skybox); 
-
+            var texture = new THREE.TextureLoader().load("clockface.png"); 
+            geometry = new THREE.PlaneGeometry(6, 6); 
+            material = new THREE.MeshBasicMaterial({map:texture, transparent: true, depthWrite: false}); 
+            clockface = new THREE.Mesh(geometry, material); 
+            clockface.position.z += 1;
+            scene.add(clockface); 
 
             //skydome code from Ian Webster http://www.ianww.com/blog/2014/02/17/making-a-skydome-in-three-dot-js/
+            //we are inside of a sphere! 
             geometry = new THREE.SphereGeometry(300, 60, 40);  
             skyUniforms = {
                 u_hour: {type: "f", value: date.getHours() + date.getMinutes() / 60}
             }
             material = new THREE.ShaderMaterial( {  
                 uniforms: skyUniforms,
-                vertexShader:   document.getElementById('sky-vertex').textContent,
-                fragmentShader: document.getElementById('sky-fragment').textContent,
+                vertexShader:   document.getElementById("skyVertex").textContent,
+                fragmentShader: document.getElementById("skyFragment").textContent,
                 side: THREE.DoubleSide
             });
-
             skyBox = new THREE.Mesh(geometry, material);  
-            skyBox.eulerOrder = 'XZY';  
+            skyBox.eulerOrder = "XZY";  
             skyBox.renderDepth = 1000.0;  
             scene.add(skyBox);  
 
-            
-            var texture = new THREE.TextureLoader().load("clockface.png"); 
-            
-            geometry = new THREE.PlaneGeometry(6, 6); 
-            material = new THREE.MeshBasicMaterial({map:texture, transparent: true, depthWrite: false}); 
-            var clockface = new THREE.Mesh(geometry, material); 
-            clockface.position.z += 1;
-            scene.add(clockface); 
-
             renderer = new THREE.WebGLRenderer();
             renderer.setPixelRatio( window.devicePixelRatio );
-
             container.appendChild( renderer.domElement );
-
             onWindowResize();
-            window.addEventListener( 'resize', onWindowResize, false );
-
-            document.onmousemove = function(e){
-              uniforms.u_mouse.value.x = e.pageX
-              uniforms.u_mouse.value.y = e.pageY
-            }
-
-            setInterval(function(){
-                tidehand.rotation.z -= Math.PI * 2 / 745; 
-            }, 60000) //move the clock hand every minute 
+            window.addEventListener( "resize", onWindowResize, false );
 
         }
 
         function onWindowResize(event) {
             renderer.setSize( window.innerWidth, window.innerHeight );
-            uniforms.u_resolution.value.x = renderer.domElement.width;
-            uniforms.u_resolution.value.y = renderer.domElement.height;
         }
 
+
         function animate() {
-        //    date = new Date(); 
-        date.setMinutes(date.getMinutes() + 1); 
-            document.getElementById("info").innerHTML = date.toString(); 
-            var diff = (date - pastHighTide) / 60000; //difference in minutes
-            diff = diff % 745; //the number of minutes in a tidal day
-            angle = -1 * Math.PI * 2 * diff / 745; //calclates angle 
-            var height = Math.cos(-1 * angle) / 7.0; 
-            uniforms.u_height.value = height; 
+            updateTide(); 
+            waterUniforms.u_time.value += 0.05;
+
             controls.update(); 
-            skyUniforms.u_hour.value = date.getHours() + date.getMinutes() / 60; 
-            tidehand.rotation.z = angle; 
-            
             requestAnimationFrame( animate );
             render();
         }
 
+        function updateTide() {
+            date = new Date(); 
+            //date.setMinutes(date.getMinutes() + 1); //artificial fast forward
+            document.getElementById("info").innerHTML = date.toLocaleString(); 
+            var diff = (date - pastHighTide) / 60000; 
+            diff = diff % 745; 
+            angle = -1 * Math.PI * 2 * diff / 745;
+            height = Math.cos(-1 * angle) / 7.0; 
+            waterUniforms.u_height.value = height; 
+            skyUniforms.u_hour.value = date.getHours() + date.getMinutes() / 60; 
+            waterUniforms.u_hour.value = date.getHours() + date.getMinutes() / 60; 
+
+            tidehand.rotation.z = angle; 
+        }
+
         function render() {
-            uniforms.u_time.value += 0.05;
             renderer.render( scene, camera );
         }
 
