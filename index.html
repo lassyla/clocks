@@ -1,11 +1,9 @@
-
 <body>
     <div id="container"></div>
     <div id="info"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/95/three.js"></script>
     <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/controls/OrbitControls.js"></script>
-    <script src="noisejs-master/perlin.js"></script>
 <style>
     body{
         margin: 0; 
@@ -22,7 +20,6 @@
 </style>
 
     <script id="waterVertex" type="x-shader/x-vertex">
-        uniform float u_noise[100];
         uniform float u_time; 
         uniform float u_height; 
         varying vec3 v_position; 
@@ -151,15 +148,8 @@
 
             var geometry = new THREE.PlaneGeometry(50, 50, 100, 100); 
 
-            var u_noise = new Float32Array(100); 
-            
-            noise.seed(Math.random()); 
-            for (var i = 0; i < u_noise.length / 2; i++) 
-                for (var j = 0; j < u_noise.length / 2; j++) 
-                    u_noise[i * 10 + j] = noise.simplex2(i / 3.0, j / 3.0) / 7.0 + 1.0; 
             
             waterUniforms = {
-                u_noise: { type: "fv1", value: u_noise}, 
                 u_time: { type: "f", value: 1.0 },
                 u_height: { type: "f", value: height},
                 u_camera: {type:"v3", value: camera.position}, 
