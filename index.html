@@ -4,6 +4,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.js"></script>
     <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.rawgit.com/mrdoob/three.js/master/examples/js/loaders/GLTFLoader.js"></script>
 <style>
     body{
         margin: 0; 
@@ -170,9 +171,9 @@
             scene.add( water );
 
             //sand geometry made in blender
-            var loader = new THREE.ObjectLoader();
-            loader.load("tallsand.json", 
-                function(geometry, materials){
+            var loader = new THREE.GLTFLoader();
+            loader.load("sand.glb", 
+                function(gltf){
                     var sandUniforms = ({
                         u_camera: {type:"v3", value: camera.position}, 
                         u_hour: {type: "f", value: date.getHours() + date.getMinutes() / 60}
@@ -183,14 +184,17 @@
                         fragmentShader: document.getElementById("sandFragment").textContent, 
                         transparent: true, 
                     } );
-                    var sandy = new THREE.Mesh(geometry, material); 
+                    var sandy = gltf.scene; 
+                    sandy.traverse( function ( child ) {
+                    if ( child instanceof THREE.Mesh ) { child.material = material;} } );
+
                     sandy.rotation.x += Math.PI / 2; 
                     sandy.scale.set(2, 2, 2); 
                     sandy.position.z = -0.001; 
                     scene.add(sandy); 
                 }, 
-                function(xhr){console.log("loaded json")},
-                function(err){console.log("error loading json")}
+                function(xhr){console.log("loaded glb")},
+                function(err){console.log(err)}
             );
                         
             
